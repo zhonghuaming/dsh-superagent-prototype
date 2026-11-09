@@ -55,4 +55,12 @@ export const KV = {
   feishu: { chats: record<Record<string, boolean>>('feishu-chats'), history: family<string, [chat: string]>('feishu-history:'),
     topics: family<Record<string, string>, [chat: string]>('feishu-history-threads:'),
     seen: family<string[], [thread: string]>('thread-seen:'), initialized: family<boolean, [thread: string]>('thread-initialized:') },
+  /**
+   * GitLab Source: per-project stream cursors (MR/Issue), per-item note checkpoints, per-project pipeline fingerprints,
+   * and the probed agent username.
+   */
+  gitlab: { stream: family<{ since: string }, [project: string, kind: string]>('gitlab-stream:'),
+    itemCursor: family<string, [project: string, item: string]>('gitlab-item-cursor:'),
+    pipeline: family<{ fingerprint: string; revision: number; defaultBranch?: string }, [project: string]>('gitlab-pipeline:'),
+    username: record<string>('gitlab-username') },
 }
