@@ -1,6 +1,8 @@
 /** Word counting and string formatting utilities for IM message limits and templates. */
 const words = new Intl.Segmenter('zh', { granularity: 'word' })
-export const IM_WORDS = 100
+// Deployment override (2026-11-09): personal deployment relays full reports to Feishu via IM;
+// 100 words truncated worker reports to useless one-liners. 1000 words ≈ a complete report.
+export const IM_WORDS = 1000
 export const NOTE_WORDS = 30
 /** Counts word-like segments across Chinese, English, and mixed text, ignoring punctuation. */
 export function wordCount(text: string): number {

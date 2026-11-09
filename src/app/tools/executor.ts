@@ -73,7 +73,7 @@ export function executorTools(host: ExecutorToolsHost, ticket: Ticket): Tool[] {
     }),
     tool({
       name: 'orchestrator_report',
-      description: 'Report progress, ready, blocked, failed or dropped, as the work and handoff sections say.',
+      description: 'Report progress, ready, blocked, failed or dropped, as the work and handoff sections say. This relay to the orchestrator is the ONLY delivery path: you cannot post to IM chats yourself, so never state that a report was posted to a chat unless you personally ran the send command in this ticket.',
       schema: z.object({
         state: z.enum(['progress', 'ready', 'blocked', 'failed', 'dropped']),
         summary: z.string().min(1),
