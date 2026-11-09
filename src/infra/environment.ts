@@ -9,7 +9,7 @@ import { delimiter, join, resolve } from 'node:path'
 import type { SubprocessOutputReader, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { Deployment } from '../deployment.ts'
 import { SetupError } from '../setup.ts'
-import { CliError } from './commands.ts'
+import { CliError, windowsBash } from './commands.ts'
 
 const MARKER = '# Written by dsh-superagent on every start; edits are lost.'
 /** Markers of files written under the project's earlier names (`dsh-tag`, `dsh-go`, `dsh-freelancer`), which `dsh-superagent` owns and replaces too. */
@@ -61,7 +61,7 @@ export function agentVariables(stateDir: string): Record<string, string | undefi
 async function written(file: string): Promise<boolean> {
   if (!(await lstat(file)).isFile()) return false
   const head = (await readFile(file, 'utf8')).split('\n', 2)
-  return [MARKER, ...LEGACY_MARKERS].some(marker => head.includes(marker))
+  return [MARKER, ...LEGACY_MARKERS].some(marker => head.some(line => line.includes(marker)))
 }
 async function own(file: string, text: string, mode = 0o644): Promise<void> {
   let foreign = false
@@ -89,6 +89,13 @@ export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' |
     await writeFile(temporary, `#!/bin/sh\n${MARKER}\n${body}\n`, { mode: 0o755 })
     await rename(temporary, join(dir, name))
     kept.add(name)
+    // Windows shells (pwsh/cmd) resolve commands through PATHEXT and cannot exec extensionless sh shims: delegate to bash.
+    if (process.platform === 'win32') {
+      const cmdTemporary = join(dir, `.${name}.cmd.${process.pid}.tmp`)
+      await writeFile(cmdTemporary, `@echo off\n@rem ${MARKER}\n"${windowsBash()}" "%~dp0${name}" %*\n`, { mode: 0o755 })
+      await rename(cmdTemporary, join(dir, `${name}.cmd`))
+      kept.add(`${name}.cmd`)
+    }
   }
   const withoutShims = [
     `self=${shellQuote(dir)}`, 'rest=', 'IFS=:', 'set -f',

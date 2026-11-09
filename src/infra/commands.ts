@@ -1,5 +1,6 @@
 /** Subprocess wrapper for running gh, lark-cli, and git commands under the deployment's configured accounts. */
 import { execFile } from 'node:child_process'
+import { accessSync } from 'node:fs'
 import { basename } from 'node:path'
 import { promisify } from 'node:util'
 import { z } from 'zod'
@@ -7,6 +8,12 @@ import type { Deployment } from '../deployment.ts'
 
 const exec = promisify(execFile)
 const TIMEOUT_MS = 90_000
+/** Windows cannot exec shebang scripts directly: CLI wrappers route through the first bash found. */
+export function windowsBash(): string {
+  const candidates = [process.env.DSH_SUPERAGENT_BASH, 'C:/Program Files/Git/bin/bash.exe', 'C:/msys64/usr/bin/bash.exe', 'C:/Program Files/Git/usr/bin/bash.exe'].filter(Boolean) as string[]
+  for (const candidate of candidates) { try { accessSync(candidate); return candidate } catch { /* try the next one */ } }
+  return 'bash'
+}
 /**
  * Error thrown by Commands when a CLI invocation fails, capturing stderr diagnostics, API error codes, and exit status without echoing command arguments.
  * Source channels and pollers inspect its code to distinguish deleted conversations from retryable failures.
@@ -67,7 +74,8 @@ export class Commands {
   withSignal(signal?: AbortSignal): Commands { return signal ? new Commands(this.resolved, this.environment, AbortSignal.any([this.signal, signal])) : this }
   async run(program: string, args: string[], cwd?: string): Promise<string> {
     try {
-      const { stdout } = await exec(program, args, { cwd, signal: this.signal, timeout: TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024,
+      const viaBash = process.platform === 'win32' && /[\\/]/.test(program) && !/\.(exe|com|cmd|bat)$/i.test(program)
+      const { stdout } = await exec(viaBash ? windowsBash() : program, viaBash ? [program, ...args] : args, { cwd, signal: this.signal, timeout: TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024,
         env: { ...process.env, ...this.environment, GH_PROMPT_DISABLED: '1', LARKSUITE_CLI_NO_UPDATE_NOTIFIER: '1', LARKSUITE_CLI_NO_SKILLS_NOTIFIER: '1' } })
       return stdout
     } catch (error) { throw commandError(error, program) }
